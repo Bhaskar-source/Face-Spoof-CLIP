@@ -59,6 +59,16 @@ def main(output_dir):
     args = parse_args()
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
+    
+    run_protocol(
+        cfg_path       = args.config,
+        protocol_label = output_dir + "_Protocol 2.2 ",
+        train_txt      = cfg["p22_train_txt"],
+        dev_txt        = cfg["p22_dev_txt"],
+        test_txt       = cfg["p22_test_txt"],
+        output_dir     = output_dir + "_p2.2",
+        cfg            = cfg,
+    )
 
     run_protocol(
         cfg_path       = args.config,
@@ -70,15 +80,7 @@ def main(output_dir):
         cfg            = cfg,
     )
 
-    run_protocol(
-        cfg_path       = args.config,
-        protocol_label = output_dir + "_Protocol 2.2 ",
-        train_txt      = cfg["p22_train_txt"],
-        dev_txt        = cfg["p22_dev_txt"],
-        test_txt       = cfg["p22_test_txt"],
-        output_dir     = output_dir + "_p2.2",
-        cfg            = cfg,
-    )
+    
 
     print("\n" + "="*65)
     print("  DONE — both protocols finished.")

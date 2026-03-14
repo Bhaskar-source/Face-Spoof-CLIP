@@ -12,6 +12,7 @@ env/
 
 # Dataset / result files
 *.csv
+*_results.yaml
 
 # Jupyter checkpoints
 .ipynb_checkpoints/

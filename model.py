@@ -1,12 +1,6 @@
 """
 UniAttackDetection Model
-Based on: "Unified Physical-Digital Face Attack Detection"
-
-Modules:
-  - Teacher-Student Prompt (TSP)
-  - Unified Knowledge Mining (UKM)
-  - Sample-Level Prompt Interaction (SLPI)
-  - Live-Center One-Class Loss
+CLIP + Prompt Learning + UKM + SLPI + OC-Softmax
 """
 
 import torch
@@ -15,9 +9,9 @@ import torch.nn.functional as F
 import clip
 
 
-# ------------------------------------------------------------------
+# -------------------------------------------------------
 # Teacher templates
-# ------------------------------------------------------------------
+# -------------------------------------------------------
 
 TEACHER_TEMPLATES = [
     "This photo contains {}.",
@@ -40,20 +34,21 @@ SPECIFIC_CLASSES = [
 ]
 
 
-# ------------------------------------------------------------------
+# -------------------------------------------------------
 # Fusion Block
-# ------------------------------------------------------------------
+# -------------------------------------------------------
 
 class FusionBlock(nn.Module):
 
     def __init__(self, d_model, num_heads=8, mlp_ratio=4.0, dropout=0.1):
+
         super().__init__()
 
         self.attn = nn.MultiheadAttention(
             d_model,
             num_heads,
             dropout=dropout,
-            batch_first=True
+            batch_first=True,
         )
 
         self.norm1 = nn.LayerNorm(d_model)
@@ -80,13 +75,14 @@ class FusionBlock(nn.Module):
         return x
 
 
-# ------------------------------------------------------------------
-# Lightweight head
-# ------------------------------------------------------------------
+# -------------------------------------------------------
+# Lightweight Head
+# -------------------------------------------------------
 
 class LightweightHead(nn.Module):
 
     def __init__(self, d_model, cs=4, cu=2):
+
         super().__init__()
 
         self.fc = nn.Linear(cs * d_model, cu * d_model)
@@ -103,9 +99,9 @@ class LightweightHead(nn.Module):
         return x.view(self.cu, self.d)
 
 
-# ------------------------------------------------------------------
-# Main model
-# ------------------------------------------------------------------
+# -------------------------------------------------------
+# UniAttackDetection
+# -------------------------------------------------------
 
 class UniAttackDetection(nn.Module):
 
@@ -117,15 +113,16 @@ class UniAttackDetection(nn.Module):
         lam=1.0,
         device="cuda",
     ):
+
         super().__init__()
 
         self.device = device
         self.lam = lam
         self.num_teacher_templates = num_teacher_templates
 
-        # ------------------------------------------------
-        # Load CLIP
-        # ------------------------------------------------
+        # ----------------------------
+        # CLIP
+        # ----------------------------
 
         self.clip, _ = clip.load(clip_model_name, device=device)
 
@@ -139,23 +136,23 @@ class UniAttackDetection(nn.Module):
         cu = len(UNIFIED_CLASSES)
         cs = len(SPECIFIC_CLASSES)
 
-        # ------------------------------------------------
-        # Student tokens
-        # ------------------------------------------------
+        # ----------------------------
+        # Student prompt tokens
+        # ----------------------------
 
         self.student_tokens = nn.Parameter(
             torch.randn(num_student_tokens, d) * 0.02
         )
 
-        # ------------------------------------------------
-        # Teacher features
-        # ------------------------------------------------
+        # ----------------------------
+        # Teacher text features
+        # ----------------------------
 
         self._build_teacher_features()
 
-        # ------------------------------------------------
-        # Fusion
-        # ------------------------------------------------
+        # ----------------------------
+        # Fusion block
+        # ----------------------------
 
         fusion_seq_len = cu * num_teacher_templates + cs
 
@@ -163,15 +160,15 @@ class UniAttackDetection(nn.Module):
 
         self.fusion_proj = nn.Linear(fusion_seq_len * d, cu * d)
 
-        # ------------------------------------------------
+        # ----------------------------
         # Lightweight head
-        # ------------------------------------------------
+        # ----------------------------
 
         self.lightweight_head = LightweightHead(d, cs=cs, cu=cu)
 
-        # ------------------------------------------------
-        # Visual prompt projection
-        # ------------------------------------------------
+        # ----------------------------
+        # SLPI projection
+        # ----------------------------
 
         dv = self.clip.visual.conv1.out_channels
 
@@ -181,21 +178,25 @@ class UniAttackDetection(nn.Module):
         self.cs = cs
         self.dv = dv
 
-        # ------------------------------------------------
-        # Live center
-        # ------------------------------------------------
+        # ----------------------------
+        # OC-Softmax parameters
+        # ----------------------------
 
         self.live_center = nn.Parameter(torch.randn(d))
 
+        self.oc_scale = 16.0
+        self.oc_m_live = 0.9
+        self.oc_m_attack = 0.2
 
-    # ------------------------------------------------
-    # Build teacher features
-    # ------------------------------------------------
+
+    # -------------------------------------------------------
+    # Teacher features
+    # -------------------------------------------------------
 
     @torch.no_grad()
     def _build_teacher_features(self):
 
-        templates = TEACHER_TEMPLATES[:self.num_teacher_templates]
+        templates = TEACHER_TEMPLATES[: self.num_teacher_templates]
 
         all_feats = []
 
@@ -216,9 +217,9 @@ class UniAttackDetection(nn.Module):
         self.register_buffer("teacher_feats", teacher)
 
 
-    # ------------------------------------------------
+    # -------------------------------------------------------
     # Encode student prompts
-    # ------------------------------------------------
+    # -------------------------------------------------------
 
     def _encode_student(self):
 
@@ -228,7 +229,7 @@ class UniAttackDetection(nn.Module):
 
         N = self.student_tokens.shape[0]
 
-        x[:, 1:1 + N, :] = self.student_tokens.unsqueeze(0).expand(
+        x[:, 1 : 1 + N, :] = self.student_tokens.unsqueeze(0).expand(
             self.cs, -1, -1
         ).type(self.clip.dtype)
 
@@ -251,9 +252,9 @@ class UniAttackDetection(nn.Module):
         return fsc.float()
 
 
-    # ------------------------------------------------
+    # -------------------------------------------------------
     # UFM loss
-    # ------------------------------------------------
+    # -------------------------------------------------------
 
     def _ufm_loss(self, ffusion):
 
@@ -272,43 +273,39 @@ class UniAttackDetection(nn.Module):
         return loss / G
 
 
-    # ------------------------------------------------
-    # Live center loss
-    # ------------------------------------------------
+    # -------------------------------------------------------
+    # OC-Softmax loss
+    # -------------------------------------------------------
 
-    def live_center_loss(self, features, labels, margin=1.0):
+    def oc_softmax_loss(self, features, labels):
+
+        features = F.normalize(features, dim=1)
 
         center = F.normalize(self.live_center, dim=0)
+
+        sim = torch.matmul(features, center)
 
         live_mask = labels == 1
         attack_mask = labels == 0
 
-        loss = 0.0
+        scores = sim.clone()
 
-        if live_mask.sum() > 0:
+        scores[live_mask] -= self.oc_m_live
+        scores[attack_mask] -= self.oc_m_attack
 
-            live_feat = features[live_mask]
+        logits = self.oc_scale * scores
 
-            loss_live = ((live_feat - center) ** 2).sum(dim=1).mean()
-
-            loss += loss_live
-
-        if attack_mask.sum() > 0:
-
-            attack_feat = features[attack_mask]
-
-            dist = torch.norm(attack_feat - center, dim=1)
-
-            loss_attack = torch.relu(margin - dist).mean()
-
-            loss += loss_attack
+        loss = F.binary_cross_entropy_with_logits(
+            logits,
+            labels.float(),
+        )
 
         return loss
 
 
-    # ------------------------------------------------
-    # Visual encoder with prompts
-    # ------------------------------------------------
+    # -------------------------------------------------------
+    # Image encoder with visual prompts
+    # -------------------------------------------------------
 
     def _encode_image_with_prompt(self, images, vp):
 
@@ -343,16 +340,19 @@ class UniAttackDetection(nn.Module):
         x = vit.ln_post(x[:, 0, :])
 
         if vit.proj is not None:
+
             x = x @ vit.proj
 
-        fv = x.float() / x.norm(dim=-1, keepdim=True)
+        fv = x.float()
+
+        fv = fv / fv.norm(dim=-1, keepdim=True)
 
         return fv
 
 
-    # ------------------------------------------------
+    # -------------------------------------------------------
     # Forward
-    # ------------------------------------------------
+    # -------------------------------------------------------
 
     def forward(self, images):
 
