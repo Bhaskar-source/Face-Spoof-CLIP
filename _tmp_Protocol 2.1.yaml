@@ -1,0 +1,15 @@
+accum_steps: 2
+batch_size: 32
+clip_model: ViT-B/16
+data_root: C:\Users\bhask\Documents\Project\Resnet_50\UniAttackData_P
+dev_txt: C:\Users\bhask\Documents\Project\Resnet_50\path\UniAttackData@p2.1_image_dev_cropped.txt
+epochs: 20
+lambda_ufm: 1.0
+lr: 0.0002
+num_student_tokens: 16
+num_teacher_templates: 6
+num_workers: 4
+output_dir: checkpoints_LC_loss_p2.1
+test_txt: C:\Users\bhask\Documents\Project\Resnet_50\path\UniAttackData@p2.1_image_test_cropped.txt
+train_txt: C:\Users\bhask\Documents\Project\Resnet_50\path\UniAttackData@p2.1_image_train_cropped.txt
+wd: 0.0001

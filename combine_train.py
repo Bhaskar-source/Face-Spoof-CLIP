@@ -62,7 +62,7 @@ def main(output_dir):
 
     run_protocol(
         cfg_path       = args.config,
-        protocol_label = "Protocol 2.1",
+        protocol_label = output_dir + "_Protocol 2.1",
         train_txt      = cfg["p21_train_txt"],
         dev_txt        = cfg["p21_dev_txt"],
         test_txt       = cfg["p21_test_txt"],
@@ -72,7 +72,7 @@ def main(output_dir):
 
     run_protocol(
         cfg_path       = args.config,
-        protocol_label = "Protocol 2.2",
+        protocol_label = output_dir + "_Protocol 2.2 ",
         train_txt      = cfg["p22_train_txt"],
         dev_txt        = cfg["p22_dev_txt"],
         test_txt       = cfg["p22_test_txt"],
@@ -88,5 +88,5 @@ def main(output_dir):
 
 
 if __name__ == "__main__":
-    output_dir="checkpoints"
+    output_dir="checkpoints_LC_loss"
     main(output_dir=output_dir)

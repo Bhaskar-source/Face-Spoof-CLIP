@@ -1,30 +1,34 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# UniAttackDetection – Protocol 2.2 Configuration
+# UniAttackDetection – Combined Protocol 2.1 & 2.2 Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Paths ──────────────────────────────────────────────────────────────────
 data_root: "C:\\Users\\bhask\\Documents\\Project\\Resnet_50\\UniAttackData_P"
 
-train_txt: "C:\\Users\\bhask\\Documents\\Project\\Resnet_50\\path\\UniAttackData@p2.2_image_train_cropped.txt"
-dev_txt:   "C:\\Users\\bhask\\Documents\\Project\\Resnet_50\\path\\UniAttackData@p2.2_image_dev_cropped.txt"
-test_txt:  "C:\\Users\\bhask\\Documents\\Project\\Resnet_50\\path\\UniAttackData@p2.2_image_test_cropped.txt"
+# ── Protocol 2.1  (train: live + physical,  test: digital attacks) ─────────
+p21_train_txt: "C:\\Users\\bhask\\Documents\\Project\\Resnet_50\\path\\UniAttackData@p2.1_image_train_cropped.txt"
+p21_dev_txt:   "C:\\Users\\bhask\\Documents\\Project\\Resnet_50\\path\\UniAttackData@p2.1_image_dev_cropped.txt"
+p21_test_txt:  "C:\\Users\\bhask\\Documents\\Project\\Resnet_50\\path\\UniAttackData@p2.1_image_test_cropped.txt"
 
-output_dir: "checkpoints_4_student_p2.2"
+# ── Protocol 2.2  (train: live + digital,   test: physical attacks) ────────
+p22_train_txt: "C:\\Users\\bhask\\Documents\\Project\\Resnet_50\\path\\UniAttackData@p2.2_image_train_cropped.txt"
+p22_dev_txt:   "C:\\Users\\bhask\\Documents\\Project\\Resnet_50\\path\\UniAttackData@p2.2_image_dev_cropped.txt"
+p22_test_txt:  "C:\\Users\\bhask\\Documents\\Project\\Resnet_50\\path\\UniAttackData@p2.2_image_test_cropped.txt"
 
 # ── CLIP backbone ──────────────────────────────────────────────────────────
 clip_model: "ViT-B/16"
 
 # ── TSP module ─────────────────────────────────────────────────────────────
-num_student_tokens:    16    # N learnable prefix tokens
-num_teacher_templates: 6     # Best value from paper ablation (T1-T6)
+num_student_tokens:    16
+num_teacher_templates: 6
 
 # ── UKM loss weight ────────────────────────────────────────────────────────
 lambda_ufm: 1.0
 
 # ── Training ───────────────────────────────────────────────────────────────
-epochs:      20            # More epochs for convergence (paper trains ~50)
+epochs:      20
 batch_size:  32
-accum_steps: 2               # Effective batch = 64 (helps stability)
-lr:          2.0e-4          # Slightly higher, warmup will ramp it up safely
+accum_steps: 2
+lr:          2.0e-4
 wd:          1.0e-4
 num_workers: 4
