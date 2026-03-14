@@ -75,9 +75,10 @@ def run_epoch(model, loader, optimizer, device,
                 set_lr(optimizer, lr)
                 step += 1
 
-            logits, ufm_loss = model(imgs)
+            logits, ufm_loss, features = model(imgs)                    # loss change 
+            center_loss = model.live_center_loss(features, labels)
             cls_loss = ce_loss_fn(logits, labels)
-            loss     = (cls_loss + model.lam * ufm_loss) / accum_steps
+            loss = cls_loss + model.lam * ufm_loss + 0.5 * center_loss
 
             if train:
                 loss.backward()
